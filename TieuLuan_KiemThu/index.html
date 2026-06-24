@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Action-State MBT: e-Banking Pro</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #1e1e2f; color: #fff; display: flex; justify-content: center; padding: 20px; }
+        .container { background: #2a2a40; padding: 30px; border-radius: 12px; box-shadow: 0 8px 16px rgba(0,0,0,0.5); width: 450px; }
+        .status-box { padding: 12px; margin-bottom: 20px; border-radius: 6px; text-align: center; font-weight: bold; text-transform: uppercase; letter-spacing: 1px;}
+        .active { background-color: #28a745; color: #fff; }
+        .locked { background-color: #dc3545; color: #fff; }
+        .pending { background-color: #ffc107; color: #000; }
+        input { width: 90%; padding: 12px; margin-bottom: 15px; border: none; border-radius: 6px; background: #3f3f5a; color: white; font-size: 14px;}
+        input:disabled { background: #202030; color: #888; }
+        button { width: 100%; padding: 12px; background-color: #007bff; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 15px; margin-bottom: 10px; font-weight: bold;}
+        button:hover { background-color: #0056b3; }
+        .btn-face-success { background-color: #20c997; }
+        .btn-face-success:hover { background-color: #1aa179; }
+        .btn-face-fake { background-color: #e83e8c; }
+        .btn-face-fake:hover { background-color: #c23375; }
+        .btn-admin { background-color: #6c757d; margin-top: 15px;}
+        .flex-row { display: flex; gap: 10px; }
+        .log-area { margin-top: 20px; background: #111; color: #00ff00; padding: 15px; height: 180px; overflow-y: auto; font-family: 'Courier New', Courier, monospace; font-size: 13px; border-radius: 6px; border: 1px solid #444;}
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2 style="text-align: center; color: #00d2ff;">e-Banking Security Guard</h2>
+    
+    <div id="statusUI" class="status-box active">
+        TRẠNG THÁI: ACTIVE (Lỗi: 0/3)
+    </div>
+
+    <label>Khách hàng:</label>
+    <input type="text" value="Hoàng Đức Hội" disabled>
+    
+    <div id="loginForm">
+        <label>Mật khẩu (Pass: 123456):</label>
+        <input type="password" id="passInput" placeholder="Nhập mật khẩu...">
+        <button onclick="triggerAction('Login_Attempt')">Đăng Nhập bằng Mật khẩu</button>
+        
+        <label style="display:block; margin-top: 10px; margin-bottom: 5px; font-size: 13px; color: #aaa;">Kiểm thử Biometrics (FaceID):</label>
+        <div class="flex-row">
+            <button class="btn-face-success" onclick="triggerAction('FaceID_Attempt', 'real_face')">📸 FaceID (Thành công)</button>
+            <button class="btn-face-fake" onclick="triggerAction('FaceID_Attempt', 'fake_face')">🎭 FaceID (Giả mạo)</button>
+        </div>
+    </div>
+
+    <div id="otpForm" style="display: none;">
+        <label>Mã OTP (Nhập 9999 để qua):</label>
+        <input type="text" id="otpInput" placeholder="Nhập 4 số OTP...">
+        <button style="background: #ff8c00;" onclick="triggerAction('OTP_Attempt')">Xác nhận OTP</button>
+    </div>
+
+    <button class="btn-admin" onclick="triggerAction('Admin_Unlock')">🛡️ [Admin] Reset Hệ Thống</button>
+
+    <div class="log-area" id="logBox">
+        > Khởi tạo Máy trạng thái hữu hạn mở rộng (EFSM)...<br>
+    </div>
+</div>
+
+<script>
+    // BỘ NHỚ HỆ THỐNG (STATE & VARIABLES)
+    let state = 'Active'; 
+    let failedAttempts = 0;
+
+    // BỘ ĐIỀU KHIỂN TRẠNG THÁI (STATE CONTROLLER - EFSM ENGINE)
+    function processStateMachine(action, payload) {
+        // Guard Block cứng khi bị khóa
+        if (state === 'Temporarily_Locked' && action !== 'Admin_Unlock') {
+            writeLog(`[GUARD BLOCKED] Từ chối hành động '${action}'. Tài khoản đang bị khóa!`, "error");
+            return;
+        }
+
+        switch(state) {
+            case 'Active':
+                if (action === 'Login_Attempt') {
+                    if (payload === '123456') {
+                        state = 'Pending_OTP'; 
+                        writeLog(`[TRANSITION] Pass đúng -> Chuyển trạng thái: Pending_OTP`, "success");
+                    } else {
+                        handleFailure("Sai mật khẩu");
+                    }
+                } 
+                else if (action === 'FaceID_Attempt') {
+                    if (payload === 'real_face') {
+                        state = 'Pending_OTP'; 
+                        writeLog(`[BIOMETRICS] Khuôn mặt hợp lệ! -> Chuyển trạng thái: Pending_OTP`, "success");
+                    } else if (payload === 'fake_face') {
+                        writeLog(`[AI DETECTED] Phát hiện dấu hiệu giả mạo sinh trắc học!`, "error");
+                        state = 'Temporarily_Locked'; 
+                        writeLog(`[TRANSITION] Khẩn cấp -> Dịch chuyển trạng thái: Temporarily_Locked`, "error");
+                    }
+                }
+                break;
+
+            case 'Pending_OTP':
+                if (action === 'OTP_Attempt') {
+                    if (payload === '9999') {
+                        failedAttempts = 0;
+                        writeLog(`[SUCCESS] Xác thực 2 bước thành công! Cấp quyền truy cập.`, "success");
+                        state = 'Active'; 
+                    } else {
+                        handleFailure("Sai mã OTP");
+                    }
+                }
+                break;
+
+            case 'Temporarily_Locked':
+                if (action === 'Admin_Unlock') {
+                    state = 'Active';
+                    failedAttempts = 0;
+                    writeLog(`[RECOVERY] Admin đã reset trạng thái về: Active`, "success");
+                }
+                break;
+        }
+        updateUI();
+    }
+
+    // XỬ LÝ BIẾN NGỮ CẢNH BỊ THA HÓA (DATA-DEPENDENT LOGIC)
+    function handleFailure(reason) {
+        failedAttempts += 1;
+        if (failedAttempts >= 3) {
+            state = 'Temporarily_Locked';
+            writeLog(`[GUARD FAILED] ${reason} lần ${failedAttempts} -> Dịch chuyển trạng thái: Temporarily_Locked`, "error");
+        } else {
+            writeLog(`[WARNING] ${reason} lần ${failedAttempts}. Trạng thái giữ nguyên.`, "warning");
+        }
+    }
+
+    // CÁC HÀM GIAO DIỆN (UI BINDING)
+    function triggerAction(action, forcePayload = null) {
+        writeLog(`\n--- Bắn sự kiện: ${action} ---`);
+        let payload = forcePayload;
+        
+        if (action === 'Login_Attempt') {
+            payload = document.getElementById("passInput").value;
+            document.getElementById("passInput").value = "";
+        } else if (action === 'OTP_Attempt') {
+            payload = document.getElementById("otpInput").value;
+            document.getElementById("otpInput").value = "";
+        }
+        
+        processStateMachine(action, payload);
+    }
+
+    function updateUI() {
+        let statusDiv = document.getElementById("statusUI");
+        let loginForm = document.getElementById("loginForm");
+        let otpForm = document.getElementById("otpForm");
+
+        if (state === 'Active') {
+            statusDiv.className = "status-box active";
+            statusDiv.innerHTML = `TRẠNG THÁI: ACTIVE (Lỗi: ${failedAttempts}/3)`;
+            loginForm.style.display = "block";
+            otpForm.style.display = "none";
+        } else if (state === 'Pending_OTP') {
+            statusDiv.className = "status-box pending";
+            statusDiv.innerHTML = `TRẠNG THÁI: CHỜ MÃ OTP (Lỗi: ${failedAttempts}/3)`;
+            loginForm.style.display = "none";
+            otpForm.style.display = "block";
+        } else {
+            statusDiv.className = "status-box locked";
+            statusDiv.innerHTML = `TRẠNG THÁI: BỊ KHÓA (Lỗi: ${failedAttempts}/3)`;
+            loginForm.style.display = "none";
+            otpForm.style.display = "none"; 
+        }
+    }
+
+    function writeLog(message, type="info") {
+        let logBox = document.getElementById("logBox");
+        let color = "#00ff00"; 
+        if (type === "error") color = "#ff4444";
+        if (type === "warning") color = "#ffcc00";
+        if (type === "success") color = "#00ffff";
+        
+        logBox.innerHTML += `<span style="color:${color}">${message}</span><br>`;
+        logBox.scrollTop = logBox.scrollHeight;
+    }
+</script>
+
+</body>
+</html>
